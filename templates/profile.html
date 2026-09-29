@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>FaceIQ – User Profile &amp; Settings</title>
+  <link rel="stylesheet" href="/static/css/style.css"/>
+  <style>
+    .avatar-picker {
+      display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px;
+    }
+    .avatar-opt {
+      font-size: 1.6rem; cursor: pointer; padding: 6px;
+      border-radius: var(--radius-sm); border: 2px solid transparent;
+      transition: all 0.2s;
+    }
+    .avatar-opt:hover, .avatar-opt.selected {
+      border-color: var(--accent-primary); background: rgba(108,99,255,0.15);
+      transform: scale(1.15);
+    }
+  </style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="nav-brand">
+    <a href="/" style="text-decoration:none; display:flex; align-items:center; gap:8px; color:inherit;">
+      <span class="logo-icon">🎭</span> FaceIQ
+    </a>
+  </div>
+  <div class="nav-links">
+    <a href="/" class="nav-link">Home</a>
+    <a href="/dashboard" class="nav-link">Dashboard</a>
+    <a href="/history" class="nav-link">History</a>
+    <a href="/analytics" class="nav-link">Analytics</a>
+    <a href="/photo_analyzer" class="nav-link">Photo AI</a>
+  </div>
+  <div class="nav-actions">
+    <div class="nav-auth">
+      <a href="/profile" class="user-badge" style="border-color:var(--accent-primary);">
+        <span class="user-avatar-icon" id="navAvatar">{{ current_user.avatar or '🎭' }}</span>
+        <span>{{ current_user.username }}</span>
+      </a>
+      <a href="/logout" class="nav-logout">Log out</a>
+    </div>
+    <button class="theme-toggle" id="themeToggle" title="Toggle theme">🌙</button>
+  </div>
+</nav>
+
+<div class="profile-layout">
+
+  <!-- Header Card -->
+  <div class="profile-header-card">
+    <div class="profile-avatar-large" id="profileAvatarDisplay">
+      {{ current_user.avatar or '🎭' }}
+    </div>
+    <div style="flex:1;">
+      <h1 class="section-title" style="font-size:1.75rem; margin-bottom:0.25rem;">
+        {{ current_user.full_name or current_user.username }}
+      </h1>
+      <p class="text-muted" style="margin-bottom:0.75rem;">
+        @{{ current_user.username }} &nbsp;&bull;&nbsp; ✉️ {{ current_user.email }}
+      </p>
+      <div class="flex gap-2 flex-wrap">
+        <span class="badge badge-purple">🎭 FaceIQ Explorer</span>
+        <span class="badge badge-cyan">📅 Member since {{ current_user.created_at.strftime('%b %Y') if current_user.created_at else '2024' }}</span>
+        <span class="badge badge-green">📊 {{ current_user.sessions|length }} Session(s) Recorded</span>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:grid; grid-template-columns:1.2fr 1fr; gap:1.5rem;">
+
+    <!-- Left: Profile Details & Preferences -->
+    <div class="flex-col gap-4">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">👤 Edit Profile</div>
+        </div>
+        <div class="card-body">
+          <form id="profileForm">
+            <div class="form-group">
+              <label class="form-label">Choose Avatar Emoji</label>
+              <div class="avatar-picker" id="avatarPicker">
+                <span class="avatar-opt" data-avatar="🎭">🎭</span>
+                <span class="avatar-opt" data-avatar="🤖">🤖</span>
+                <span class="avatar-opt" data-avatar="🚀">🚀</span>
+                <span class="avatar-opt" data-avatar="🧠">🧠</span>
+                <span class="avatar-opt" data-avatar="⚡">⚡</span>
+                <span class="avatar-opt" data-avatar="🎨">🎨</span>
+                <span class="avatar-opt" data-avatar="😎">😎</span>
+                <span class="avatar-opt" data-avatar="✨">✨</span>
+              </div>
+              <input type="hidden" id="selectedAvatar" name="avatar" value="{{ current_user.avatar or '🎭' }}"/>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="profFullName">Full Name</label>
+              <input type="text" id="profFullName" name="full_name" class="input-control" value="{{ current_user.full_name or '' }}" placeholder="Your name"/>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="profBio">Bio / Headline</label>
+              <input type="text" id="profBio" name="bio" class="input-control" value="{{ current_user.bio or '' }}" placeholder="Short bio"/>
+            </div>
+
+            <button type="submit" class="btn btn-primary" id="btnSaveProfile">
+              💾 Save Profile Changes
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Detection Preferences -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">⚙️ Detection Preferences</div>
+        </div>
+        <div class="card-body">
+          <form id="settingsForm">
+            <div class="flex items-center justify-between mb-4" style="padding-bottom:1rem; border-bottom:1px solid var(--border);">
+              <div>
+                <div class="font-semibold" style="font-size:0.95rem;">Stress Audio Alert</div>
+                <div class="text-xs text-muted">Play a gentle chime when negative emotions exceed threshold</div>
+              </div>
+              <div class="flex items-center gap-2">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="playChimeSound()" title="Test chime sound">🔔 Test</button>
+                <input type="checkbox" id="soundAlertsToggle" name="sound_alerts" style="width:20px; height:20px; accent-color:var(--accent-primary);" checked/>
+              </div>
+            </div>
+
+            <div class="mb-4" style="padding-bottom:1rem; border-bottom:1px solid var(--border);">
+              <div class="flex justify-between items-center mb-1">
+                <label class="font-semibold" style="font-size:0.95rem;">Stress Alert Threshold</label>
+                <span class="badge badge-purple" id="thresholdVal">50%</span>
+              </div>
+              <div class="text-xs text-muted mb-2">Triggers alert when negative emotions exceed this percentage</div>
+              <input type="range" id="thresholdRange" min="30" max="80" value="50" step="5" style="width:100%; accent-color:var(--accent-primary);"/>
+            </div>
+
+            <div class="form-group mb-4">
+              <label class="font-semibold" style="font-size:0.95rem; display:block; margin-bottom:4px;">Preferred Webcam Device</label>
+              <select id="cameraIndexSelect" class="input-control" style="cursor:pointer;">
+                <option value="0">Camera 0 (Default Integrated Webcam)</option>
+                <option value="1">Camera 1 (External USB / OBS Virtual)</option>
+                <option value="2">Camera 2 (Secondary Device)</option>
+              </select>
+            </div>
+
+            <button type="button" class="btn btn-primary" onclick="saveSettings()">
+              ✓ Apply Settings
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: Security & Quick Links -->
+    <div class="flex-col gap-4">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">🔐 Change Password</div>
+        </div>
+        <div class="card-body">
+          <form id="passwordForm" onsubmit="changePassword(event)">
+            <div class="form-group">
+              <label class="form-label" for="currPass">Current Password</label>
+              <input type="password" id="currPass" class="input-control" placeholder="••••••••" required/>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="newPass">New Password</label>
+              <input type="password" id="newPass" class="input-control" placeholder="At least 6 characters" minlength="6" required/>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="confPass">Confirm New Password</label>
+              <input type="password" id="confPass" class="input-control" placeholder="Re-enter new password" required/>
+            </div>
+            <button type="submit" class="btn btn-secondary w-full">
+              🔑 Update Password
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">⚡ Quick Actions</div>
+        </div>
+        <div class="card-body flex-col gap-2">
+          <a href="/dashboard" class="btn btn-primary w-full">📹 Launch Live Dashboard</a>
+          <a href="/history" class="btn btn-secondary w-full">🗂️ View Session History</a>
+          <a href="/analytics" class="btn btn-secondary w-full">📊 Detailed Analytics</a>
+          <a href="/logout" class="btn btn-danger w-full" style="margin-top:0.5rem;">🚪 Log Out of Account</a>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+  // Theme toggle
+  const themeToggle = document.getElementById('themeToggle');
+  (function() {
+    const saved = localStorage.getItem('theme') || 'dark';
+    if (saved === 'light') { document.body.classList.add('light'); themeToggle.textContent = '☀️'; }
+  })();
+  themeToggle.addEventListener('click', () => {
+    document.body.classList.toggle('light');
+    const isLight = document.body.classList.contains('light');
+    themeToggle.textContent = isLight ? '☀️' : '🌙';
+    localStorage.setItem('theme', isLight ? 'light' : 'dark');
+  });
+
+  // Toast
+  function showToast(msg, type='info') {
+    const tc = document.getElementById('toastContainer');
+    const t = document.createElement('div');
+    t.className = `toast ${type}`;
+    t.innerHTML = `<span>${msg}</span>`;
+    tc.appendChild(t);
+    setTimeout(() => { t.classList.add('toast-out'); setTimeout(() => t.remove(), 300); }, 3500);
+  }
+
+  // Avatar picker
+  const pickerOpts = document.querySelectorAll('.avatar-opt');
+  const selectedInput = document.getElementById('selectedAvatar');
+  const avatarDisplay = document.getElementById('profileAvatarDisplay');
+  const navAvatar = document.getElementById('navAvatar');
+
+  pickerOpts.forEach(opt => {
+    if (opt.dataset.avatar === selectedInput.value) opt.classList.add('selected');
+    opt.addEventListener('click', () => {
+      pickerOpts.forEach(o => o.classList.remove('selected'));
+      opt.classList.add('selected');
+      selectedInput.value = opt.dataset.avatar;
+      avatarDisplay.textContent = opt.dataset.avatar;
+    });
+  });
+
+  // Profile save
+  document.getElementById('profileForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+      const res = await fetch('/api/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          avatar: selectedInput.value,
+          full_name: document.getElementById('profFullName').value,
+          bio: document.getElementById('profBio').value
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast('✅ Profile updated successfully!', 'success');
+        if (navAvatar) navAvatar.textContent = selectedInput.value;
+      } else {
+        showToast(data.error || 'Failed to update profile', 'error');
+      }
+    } catch(err) { showToast('Error saving profile', 'error'); }
+  });
+
+  // Range slider
+  const range = document.getElementById('thresholdRange');
+  const rangeVal = document.getElementById('thresholdVal');
+  range.addEventListener('input', () => {
+    rangeVal.textContent = range.value + '%';
+  });
+
+  // Audio test using Web Audio API synthesizer chime
+  function playChimeSound() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+      osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.15); // A5
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.4);
+      showToast('🔔 Chime preview played', 'info');
+    } catch(e) {
+      showToast('Audio preview not supported in this browser.', 'warning');
+    }
+  }
+
+  function saveSettings() {
+    const sound = document.getElementById('soundAlertsToggle').checked;
+    const threshold = parseInt(range.value);
+    const camera = parseInt(document.getElementById('cameraIndexSelect').value);
+    localStorage.setItem('faceiq_sound_alerts', sound);
+    localStorage.setItem('faceiq_stress_threshold', threshold);
+    localStorage.setItem('faceiq_camera_index', camera);
+
+    fetch('/api/switch_camera', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ camera_index: camera })
+    });
+
+    showToast('⚙️ Settings applied successfully!', 'success');
+  }
+
+  async function changePassword(e) {
+    e.preventDefault();
+    const curr = document.getElementById('currPass').value;
+    const n = document.getElementById('newPass').value;
+    const conf = document.getElementById('confPass').value;
+
+    if (n !== conf) {
+      showToast('New passwords do not match!', 'error');
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/change_password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ current_password: curr, new_password: n })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast('🔑 Password changed successfully!', 'success');
+        document.getElementById('passwordForm').reset();
+      } else {
+        showToast(data.error || 'Failed to change password', 'error');
+      }
+    } catch(err) {
+      showToast('Error changing password', 'error');
+    }
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>FaceIQ – Photo AI Emotion Analyzer</title>
+  <meta name="description" content="Upload any photo to detect faces, analyze human expressions, and get individual emotion breakdowns."/>
+  <link rel="stylesheet" href="/static/css/style.css"/>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="nav-brand">
+    <a href="/" style="text-decoration:none; display:flex; align-items:center; gap:8px; color:inherit;">
+      <span class="logo-icon">🎭</span> FaceIQ
+    </a>
+  </div>
+  <div class="nav-links">
+    <a href="/" class="nav-link">Home</a>
+    <a href="/dashboard" class="nav-link">Dashboard</a>
+    <a href="/history" class="nav-link">History</a>
+    <a href="/analytics" class="nav-link">Analytics</a>
+    <a href="/photo_analyzer" class="nav-link active">Photo AI</a>
+  </div>
+  <div class="nav-actions">
+    {% if current_user.is_authenticated %}
+    <div class="nav-auth">
+      <a href="/profile" class="user-badge">
+        <span class="user-avatar-icon">{{ current_user.avatar or '🎭' }}</span>
+        <span>{{ current_user.username }}</span>
+      </a>
+      <a href="/logout" class="nav-logout">Log out</a>
+    </div>
+    {% else %}
+    <a href="/login" class="btn btn-secondary btn-sm">Sign in</a>
+    {% endif %}
+    <button class="theme-toggle" id="themeToggle" title="Toggle theme">🌙</button>
+  </div>
+</nav>
+
+<div class="photo-analyzer-layout">
+
+  <!-- Header -->
+  <div>
+    <div style="margin-bottom:0.25rem;">
+      <span class="badge badge-purple">📸 Image Recognition Engine</span>
+    </div>
+    <h1 class="section-title" style="margin-bottom:0.4rem;">
+      Photo <span class="highlight">Emotion Analyzer</span>
+    </h1>
+    <p class="text-muted">Upload any photo (portraits, group photos, selfies) to detect multiple faces and breakdown each person's emotions.</p>
+  </div>
+
+  <!-- Upload Area / Dropzone -->
+  <div class="dropzone" id="dropzone">
+    <input type="file" id="fileInput" accept="image/*" style="display:none;"/>
+    <div class="dropzone-icon">🖼️</div>
+    <div class="dropzone-title">Drag &amp; Drop Photo Here, or <span class="highlight">Browse Files</span></div>
+    <p class="text-muted text-xs" style="margin-top:0.4rem;">Supports JPEG, PNG, WEBP, BMP up to 10MB</p>
+
+    <!-- Quick sample buttons -->
+    <div class="flex gap-2 justify-center mt-3 flex-wrap">
+      <span class="text-xs text-muted" style="align-self:center;">Try a demo:</span>
+      <button type="button" class="btn btn-secondary btn-sm" onclick="loadSamplePhoto('happy')">😄 Happy Smile</button>
+      <button type="button" class="btn btn-secondary btn-sm" onclick="loadSamplePhoto('group')">👥 Multi-Person</button>
+      <button type="button" class="btn btn-secondary btn-sm" onclick="loadSamplePhoto('neutral')">😐 Neutral Portrait</button>
+    </div>
+  </div>
+
+  <!-- Results Section (hidden initially) -->
+  <div id="resultsSection" style="display:none; flex-direction:column; gap:1.5rem;">
+
+    <div class="flex items-center gap-3" style="justify-content:space-between; flex-wrap:wrap;">
+      <div class="flex items-center gap-2">
+        <span class="badge badge-green" id="resFaceCount">0 Faces Detected</span>
+        <span class="badge badge-purple" id="resDominantMood">Mood: Neutral</span>
+      </div>
+      <div class="flex gap-2">
+        <a id="downloadAnnotatedBtn" class="btn btn-primary btn-sm" download="faceiq_analyzed.jpg">
+          ⬇ Download Annotated Image
+        </a>
+        <button class="btn btn-secondary btn-sm" onclick="resetUpload()">
+          ↻ Analyze Another Photo
+        </button>
+      </div>
+    </div>
+
+    <div class="photo-results-grid">
+      <!-- Annotated Image Box -->
+      <div class="card" style="padding:0; overflow:hidden;">
+        <div class="card-header">
+          <div class="card-title">🎯 AI Annotated Detection</div>
+          <span class="text-xs text-muted" id="imageDimensions">—</span>
+        </div>
+        <div class="card-body" style="padding:0; background:#0a0a14;">
+          <div class="annotated-preview-box">
+            <img id="annotatedImage" src="" alt="Analyzed photo with emotion bounding boxes"/>
+          </div>
+        </div>
+      </div>
+
+      <!-- Face Breakdown List -->
+      <div class="flex-col gap-3">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">👥 Individual Face Analysis</div>
+          </div>
+          <div class="card-body" id="faceListContainer" style="max-height:550px; overflow-y:auto; padding:1rem;">
+            <!-- Generated dynamically via JS -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+  // Theme toggle
+  const themeToggle = document.getElementById('themeToggle');
+  (function() {
+    const saved = localStorage.getItem('theme') || 'dark';
+    if (saved === 'light') { document.body.classList.add('light'); themeToggle.textContent = '☀️'; }
+  })();
+  themeToggle.addEventListener('click', () => {
+    document.body.classList.toggle('light');
+    const isLight = document.body.classList.contains('light');
+    themeToggle.textContent = isLight ? '☀️' : '🌙';
+    localStorage.setItem('theme', isLight ? 'light' : 'dark');
+  });
+
+  // Toast
+  function showToast(msg, type='info') {
+    const tc = document.getElementById('toastContainer');
+    const t = document.createElement('div');
+    t.className = `toast ${type}`;
+    t.innerHTML = `<span>${msg}</span>`;
+    tc.appendChild(t);
+    setTimeout(() => { t.classList.add('toast-out'); setTimeout(() => t.remove(), 300); }, 3500);
+  }
+
+  const dropzone = document.getElementById('dropzone');
+  const fileInput = document.getElementById('fileInput');
+  const resultsSection = document.getElementById('resultsSection');
+  const annotatedImage = document.getElementById('annotatedImage');
+  const downloadAnnotatedBtn = document.getElementById('downloadAnnotatedBtn');
+  const resFaceCount = document.getElementById('resFaceCount');
+  const resDominantMood = document.getElementById('resDominantMood');
+  const faceListContainer = document.getElementById('faceListContainer');
+  const imageDimensions = document.getElementById('imageDimensions');
+
+  const EMOJIS = { happy:'😄', sad:'😢', angry:'😠', fear:'😨', disgust:'🤢', surprise:'😲', neutral:'😐' };
+  const EMOTION_COLORS = {
+    happy:'#FFD700', sad:'#4A90D9', angry:'#E74C3C',
+    fear:'#E67E22', disgust:'#27AE60', surprise:'#9B59B6', neutral:'#95A5A6'
+  };
+
+  dropzone.addEventListener('click', (e) => {
+    if (e.target.tagName !== 'BUTTON') fileInput.click();
+  });
+
+  ['dragenter', 'dragover'].forEach(ev => {
+    dropzone.addEventListener(ev, (e) => { e.preventDefault(); dropzone.classList.add('dragover'); });
+  });
+
+  ['dragleave', 'drop'].forEach(ev => {
+    dropzone.addEventListener(ev, (e) => { e.preventDefault(); dropzone.classList.remove('dragover'); });
+  });
+
+  dropzone.addEventListener('drop', (e) => {
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleFile(e.dataTransfer.files[0]);
+    }
+  });
+
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files && fileInput.files[0]) {
+      handleFile(fileInput.files[0]);
+    }
+  });
+
+  async function handleFile(file) {
+    if (!file.type.startsWith('image/')) {
+      showToast('Please select a valid image file', 'error');
+      return;
+    }
+
+    showToast('⚙️ Analyzing faces and expressions with AI…', 'info');
+    dropzone.style.opacity = '0.6';
+
+    const formData = new FormData();
+    formData.append('photo', file);
+
+    try {
+      const res = await fetch('/api/analyze_photo', {
+        method: 'POST',
+        body: formData
+      });
+      const data = await res.json();
+      dropzone.style.opacity = '1';
+
+      if (data.error) {
+        showToast(data.error, 'error');
+        return;
+      }
+
+      displayResults(data);
+      showToast(`✅ Analysis complete: ${data.face_count} face(s) found!`, 'success');
+    } catch(e) {
+      dropzone.style.opacity = '1';
+      showToast('Failed to analyze image.', 'error');
+    }
+  }
+
+  function displayResults(data) {
+    resultsSection.style.display = 'flex';
+    annotatedImage.src = data.annotated_image;
+    downloadAnnotatedBtn.href = data.annotated_image;
+
+    resFaceCount.textContent = `👤 ${data.face_count} Face(s) Detected`;
+    resDominantMood.textContent = `Mood: ${(data.dominant||'neutral').toUpperCase()}`;
+
+    if (data.width && data.height) {
+      imageDimensions.textContent = `${data.width} × ${data.height} px`;
+    }
+
+    if (!data.faces || !data.faces.length) {
+      faceListContainer.innerHTML = '<div class="text-muted text-center p-4">No faces were clearly detected in this image. Try another angle or lighting.</div>';
+      return;
+    }
+
+    faceListContainer.innerHTML = data.faces.map((face, i) => {
+      const dom = face.dominant || 'neutral';
+      const col = EMOTION_COLORS[dom] || '#888';
+      const r = face.region || {};
+      const emos = face.emotions || {};
+      const sortedEmos = Object.entries(emos).sort((a,b) => b[1] - a[1]);
+
+      return `
+        <div class="face-analysis-card" style="border-left: 4px solid ${col};">
+          <div class="flex items-center justify-between mb-2">
+            <div style="font-weight:700; font-size:1.05rem;">
+              Face #${i+1} &nbsp; <span style="color:${col}">${EMOJIS[dom]||''} ${dom.toUpperCase()}</span>
+            </div>
+            <span class="badge" style="background:${col}22; color:${col}; border:1px solid ${col}44;">
+              ${(emos[dom]||0).toFixed(0)}% Confidence
+            </span>
+          </div>
+
+          <div class="text-xs text-muted mb-3">
+            Region: x:${r.x||0}, y:${r.y||0} &bull; Size: ${r.w||0}×${r.h||0}px
+          </div>
+
+          <div class="emotion-bars">
+            ${sortedEmos.slice(0, 4).map(([emo, val]) => `
+              <div class="emotion-bar-row">
+                <div class="emotion-bar-label">${EMOJIS[emo]||''} ${emo}</div>
+                <div class="emotion-bar-track">
+                  <div class="emotion-bar-fill" style="width:${val.toFixed(1)}%; background:${EMOTION_COLORS[emo]||'#888'};"></div>
+                </div>
+                <div class="emotion-bar-pct">${val.toFixed(0)}%</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    resultsSection.scrollIntoView({ behavior: 'smooth' });
+  }
+
+  function resetUpload() {
+    fileInput.value = '';
+    resultsSection.style.display = 'none';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  // Generate demo samples using canvas if user clicks demo buttons
+  function loadSamplePhoto(type) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 640;
+    canvas.height = 480;
+    const ctx = canvas.getContext('2d');
+
+    // Gradient background
+    const grad = ctx.createLinearGradient(0, 0, 640, 480);
+    grad.addColorStop(0, '#1e1a3a');
+    grad.addColorStop(1, '#0e0b1f');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 640, 480);
+
+    // Draw stylized human face demonstration
+    if (type === 'happy' || type === 'neutral') {
+      drawDemoFace(ctx, 320, 220, 100, type === 'happy');
+    } else {
+      // Group: 2 faces
+      drawDemoFace(ctx, 200, 220, 80, true);
+      drawDemoFace(ctx, 440, 220, 80, false);
+    }
+
+    canvas.toBlob((blob) => {
+      const file = new File([blob], `sample_${type}.jpg`, { type: 'image/jpeg' });
+      handleFile(file);
+    }, 'image/jpeg', 0.95);
+  }
+
+  function drawDemoFace(ctx, x, y, r, isHappy) {
+    // Face circle (skin tone)
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fillStyle = '#f5c6a5';
+    ctx.fill();
+    ctx.strokeStyle = '#c99672';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    // Eyes
+    ctx.fillStyle = '#222';
+    ctx.beginPath();
+    ctx.arc(x - r*0.35, y - r*0.15, r*0.1, 0, Math.PI * 2);
+    ctx.arc(x + r*0.35, y - r*0.15, r*0.1, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Eyebrows
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(x - r*0.5, y - r*0.32);
+    ctx.lineTo(x - r*0.2, y - r*0.35);
+    ctx.moveTo(x + r*0.2, y - r*0.35);
+    ctx.lineTo(x + r*0.5, y - r*0.32);
+    ctx.stroke();
+
+    // Mouth
+    ctx.beginPath();
+    if (isHappy) {
+      ctx.arc(x, y + r*0.2, r*0.45, 0.15 * Math.PI, 0.85 * Math.PI, false);
+      ctx.strokeStyle = '#c0392b';
+      ctx.lineWidth = 6;
+      ctx.stroke();
+    } else {
+      ctx.moveTo(x - r*0.3, y + r*0.4);
+      ctx.lineTo(x + r*0.3, y + r*0.4);
+      ctx.strokeStyle = '#555';
+      ctx.lineWidth = 5;
+      ctx.stroke();
+    }
+  }
+</script>
+</body>
+</html>

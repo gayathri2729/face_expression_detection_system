@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>FaceIQ – Login</title>
+  <meta name="description" content="Sign in to your FaceIQ account to access real-time emotion detection, session history, and reports."/>
+  <link rel="stylesheet" href="/static/css/style.css"/>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="nav-brand">
+    <a href="/" style="text-decoration:none; display:flex; align-items:center; gap:8px; color:inherit;">
+      <span class="logo-icon">🎭</span> FaceIQ
+    </a>
+  </div>
+  <div class="nav-links">
+    <a href="/" class="nav-link">Home</a>
+    <a href="/login" class="nav-link active">Login</a>
+    <a href="/register" class="nav-link">Register</a>
+  </div>
+  <div class="nav-actions">
+    <button class="theme-toggle" id="themeToggle" title="Toggle theme">🌙</button>
+  </div>
+</nav>
+
+<div class="auth-wrapper">
+  <!-- Glowing background elements -->
+  <div class="hero-bg-orb orb-1"></div>
+  <div class="hero-bg-orb orb-2"></div>
+
+  <div class="auth-card">
+    <div class="auth-header">
+      <div class="auth-icon">🎭</div>
+      <h1 class="auth-title">Welcome Back</h1>
+      <p class="auth-subtitle">Sign in to your FaceIQ workspace</p>
+    </div>
+
+    <!-- Quick Demo Credentials Box -->
+    <div class="demo-box" id="demoBanner">
+      <div>
+        <strong>⚡ Quick Demo:</strong> User: <code>demo</code> | Pass: <code>demo123</code>
+      </div>
+      <button type="button" class="btn btn-secondary btn-sm" id="btnFillDemo">Auto Fill</button>
+    </div>
+
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div style="padding:10px 14px; border-radius:var(--radius-md); margin-bottom:1.25rem; font-size:0.88rem;
+               background:{% if category=='error' %}rgba(255,71,87,0.15){% elif category=='success' %}rgba(0,255,136,0.15){% else %}rgba(0,212,255,0.15){% endif %};
+               border:1px solid {% if category=='error' %}var(--accent-red){% elif category=='success' %}var(--accent-green){% else %}var(--accent-secondary){% endif %};
+               color:{% if category=='error' %}var(--accent-red){% elif category=='success' %}var(--accent-green){% else %}var(--accent-secondary){% endif %};">
+            {{ message }}
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <form method="POST" action="/login" id="loginForm">
+      <div class="form-group">
+        <label class="form-label" for="username">Username or Email</label>
+        <div class="input-group">
+          <span class="input-icon">👤</span>
+          <input type="text" id="username" name="username" class="input-control" placeholder="Enter username or email" required autofocus/>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="password">Password</label>
+        <div class="input-group">
+          <span class="input-icon">🔒</span>
+          <input type="password" id="password" name="password" class="input-control" placeholder="Enter your password" required/>
+          <button type="button" class="password-toggle" id="togglePassword" title="Show/hide password">👁️</button>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2 mb-4" style="justify-content:space-between; font-size:0.85rem;">
+        <label class="flex items-center gap-2" style="cursor:pointer; color:var(--text-secondary);">
+          <input type="checkbox" name="remember" style="accent-color:var(--accent-primary);"/> Remember me
+        </label>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-lg w-full" id="btnLoginSubmit">
+        🚀 Sign In
+      </button>
+    </form>
+
+    <div class="auth-footer">
+      Don't have an account? <a href="/register">Create one now</a>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Theme toggle
+  const themeToggle = document.getElementById('themeToggle');
+  (function() {
+    const saved = localStorage.getItem('theme') || 'dark';
+    if (saved === 'light') { document.body.classList.add('light'); themeToggle.textContent = '☀️'; }
+  })();
+  themeToggle.addEventListener('click', () => {
+    document.body.classList.toggle('light');
+    const isLight = document.body.classList.contains('light');
+    themeToggle.textContent = isLight ? '☀️' : '🌙';
+    localStorage.setItem('theme', isLight ? 'light' : 'dark');
+  });
+
+  // Password toggle
+  const toggleBtn = document.getElementById('togglePassword');
+  const passInput = document.getElementById('password');
+  toggleBtn.addEventListener('click', () => {
+    const isPass = passInput.type === 'password';
+    passInput.type = isPass ? 'text' : 'password';
+    toggleBtn.textContent = isPass ? '🙈' : '👁️';
+  });
+
+  // Demo auto-fill
+  document.getElementById('btnFillDemo').addEventListener('click', () => {
+    document.getElementById('username').value = 'demo';
+    document.getElementById('password').value = 'demo123';
+  });
+</script>
+</body>
+</html>

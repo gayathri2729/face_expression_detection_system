@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>FaceIQ – Analytics</title>
+  <link rel="stylesheet" href="/static/css/style.css"/>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="nav-brand">
+    <a href="/" style="text-decoration:none; display:flex; align-items:center; gap:8px; color:inherit;">
+      <span class="logo-icon">🎭</span> FaceIQ
+    </a>
+  </div>
+  <div class="nav-links">
+    <a href="/" class="nav-link">Home</a>
+    <a href="/dashboard" class="nav-link">Dashboard</a>
+    <a href="/history" class="nav-link">History</a>
+    <a href="/analytics" class="nav-link active">Analytics</a>
+    <a href="/photo_analyzer" class="nav-link">Photo AI</a>
+  </div>
+  <div class="nav-actions">
+    {% if current_user.is_authenticated %}
+    <div class="nav-auth">
+      <a href="/profile" class="user-badge">
+        <span class="user-avatar-icon">{{ current_user.avatar or '🎭' }}</span>
+        <span>{{ current_user.username }}</span>
+      </a>
+      <a href="/logout" class="nav-logout">Log out</a>
+    </div>
+    {% else %}
+    <a href="/login" class="btn btn-secondary btn-sm">Sign in</a>
+    {% endif %}
+    <button class="theme-toggle" id="themeToggle" title="Toggle theme">🌙</button>
+  </div>
+</nav>
+
+<div class="analytics-layout">
+
+  <!-- ── LEFT: Session Sidebar ──────────────────────────────────────────── -->
+  <div class="analytics-sidebar">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">🗂 Session History</div>
+        <span class="badge badge-purple" id="sessionCount">{{ sessions|length }} sessions</span>
+      </div>
+      <div class="card-body">
+        {% if sessions %}
+        <div class="session-list" id="sessionList">
+          {% for s in sessions %}
+          <div class="session-item" data-id="{{ s.id }}" onclick="loadSession('{{ s.id }}')">
+            <div class="session-item-id">Session #{{ s.id }}</div>
+            <div class="session-item-time">{{ s.start_time[:19].replace('T',' ') }}</div>
+            {% if s.summary %}
+            <div class="session-item-mood">{{ s.summary.dominant|capitalize }} dominant</div>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-muted" style="font-size:0.88rem;">No sessions recorded yet. Start one from the <a href="/dashboard" style="color:var(--accent-primary);">Dashboard</a>.</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Snapshot Gallery -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">📸 Snapshot Gallery</div>
+        <button class="btn btn-secondary btn-sm" onclick="loadSnapshots()">↻ Refresh</button>
+      </div>
+      <div class="card-body">
+        <div class="snapshot-grid" id="snapshotGrid">
+          <div class="text-muted text-xs">Loading snapshots…</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── RIGHT: Main Analytics Area ────────────────────────────────────── -->
+  <div class="analytics-main">
+
+    <!-- Placeholder when no session selected -->
+    <div id="noSessionMsg" class="card" style="text-align:center; padding:4rem;">
+      <div style="font-size:3rem; margin-bottom:1rem;">📊</div>
+      <div class="section-title" style="font-size:1.3rem; margin-bottom:0.5rem;">Select a Session</div>
+      <div class="text-muted">Click a session from the sidebar to view its analytics, charts, and mood report.</div>
+    </div>
+
+    <!-- Session Analytics (hidden until loaded) -->
+    <div id="sessionAnalytics" style="display:none; flex-direction:column; gap:1.5rem;">
+
+      <!-- Header -->
+      <div class="card">
+        <div class="card-body">
+          <div class="flex items-center gap-4" style="justify-content:space-between; flex-wrap:wrap;">
+            <div>
+              <div class="section-title" style="font-size:1.3rem; margin-bottom:0.25rem;">
+                Session <span class="highlight" id="detailId">#—</span>
+              </div>
+              <div class="text-muted" id="detailTime">—</div>
+            </div>
+            <div class="flex gap-3 flex-wrap">
+              <button class="btn btn-gold btn-sm" id="btnExportPDF">📄 Export PDF</button>
+              <button class="btn btn-secondary btn-sm" id="btnExportCSV">📥 Export CSV</button>
+              <a href="/dashboard" class="btn btn-primary btn-sm">🎥 New Session</a>
+            </div>
+          </div>
+
+          <div class="flex gap-3 mt-4 flex-wrap">
+            <div style="flex:1; min-width:140px; text-align:center; padding:1rem; border:1px solid var(--border); border-radius:var(--radius-md);">
+              <div style="font-size:2rem;" id="detailEmoji">😐</div>
+              <div style="font-size:0.8rem; color:var(--text-secondary); margin-top:4px;">Dominant</div>
+              <div class="font-semibold" id="detailDominant">—</div>
+            </div>
+            <div style="flex:1; min-width:140px; text-align:center; padding:1rem; border:1px solid var(--border); border-radius:var(--radius-md);">
+              <div style="font-size:2rem;">🎞</div>
+              <div style="font-size:0.8rem; color:var(--text-secondary); margin-top:4px;">Frames</div>
+              <div class="font-semibold" id="detailFrames">—</div>
+            </div>
+            <div style="flex:1; min-width:140px; text-align:center; padding:1rem; border:1px solid var(--border); border-radius:var(--radius-md);">
+              <div style="font-size:2rem; color:var(--accent-green);">😊</div>
+              <div style="font-size:0.8rem; color:var(--text-secondary); margin-top:4px;">Positive</div>
+              <div class="font-semibold emo-happy" id="detailPositive">—</div>
+            </div>
+            <div style="flex:1; min-width:140px; text-align:center; padding:1rem; border:1px solid var(--border); border-radius:var(--radius-md);">
+              <div style="font-size:2rem;">😟</div>
+              <div style="font-size:0.8rem; color:var(--text-secondary); margin-top:4px;">Negative</div>
+              <div class="font-semibold emo-angry" id="detailNegative">—</div>
+            </div>
+          </div>
+
+          <!-- Mood text -->
+          <div class="mt-4" id="moodTextBox" style="padding:14px 18px; border-radius:var(--radius-md); background:rgba(108,99,255,0.1); border:1px solid rgba(108,99,255,0.25); font-size:0.95rem;">
+            <span id="detailMoodText">—</span>
+          </div>
+
+          <!-- Stress alert -->
+          <div class="stress-alert mt-4" id="analyticsStressAlert">
+            🚨 <strong>Stress Warning:</strong> This session had high negative emotion levels.
+          </div>
+        </div>
+      </div>
+
+      <!-- Charts Row -->
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem;">
+        <div class="card">
+          <div class="card-header"><div class="card-title">🍩 Emotion Distribution</div></div>
+          <div class="card-body">
+            <div class="chart-container"><canvas id="donutCanvas"></canvas></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">📊 Session Timeline</div></div>
+          <div class="card-body">
+            <div class="chart-container"><canvas id="sessionTimelineCanvas"></canvas></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Emotion distribution bars -->
+      <div class="card">
+        <div class="card-header"><div class="card-title">🎯 Emotion Breakdown</div></div>
+        <div class="card-body">
+          <div class="emotion-bars" id="analyticsEmotionBars"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="/static/js/charts.js"></script>
+<script>
+// ── Theme ──────────────────────────────────────────────────────────────────────
+const themeToggle = document.getElementById('themeToggle');
+(function() {
+  const saved = localStorage.getItem('theme') || 'dark';
+  if (saved === 'light') { document.body.classList.add('light'); themeToggle.textContent = '☀️'; }
+})();
+themeToggle.addEventListener('click', () => {
+  document.body.classList.toggle('light');
+  const isLight = document.body.classList.contains('light');
+  themeToggle.textContent = isLight ? '☀️' : '🌙';
+  localStorage.setItem('theme', isLight ? 'light' : 'dark');
+});
+
+// ── Toast ──────────────────────────────────────────────────────────────────────
+function showToast(msg, type='info') {
+  const tc = document.getElementById('toastContainer');
+  const t = document.createElement('div');
+  t.className = `toast ${type}`;
+  t.innerHTML = `<span>${msg}</span>`;
+  tc.appendChild(t);
+  setTimeout(() => { t.classList.add('toast-out'); setTimeout(() => t.remove(), 300); }, 3500);
+}
+
+// ── Emotion helpers ────────────────────────────────────────────────────────────
+const EMOJIS = { happy:'😄', sad:'😢', angry:'😠', fear:'😨', disgust:'🤢', surprise:'😲', neutral:'😐' };
+const EMOTION_COLORS_JS = {
+  happy:'#FFD700', sad:'#4A90D9', angry:'#E74C3C',
+  fear:'#E67E22', disgust:'#27AE60', surprise:'#9B59B6', neutral:'#95A5A6'
+};
+const EMOTIONS_ORDER = ['happy','sad','angry','fear','disgust','surprise','neutral'];
+
+function buildEmotionBars(containerId, distribution) {
+  const c = document.getElementById(containerId);
+  if (!c) return;
+  const sorted = EMOTIONS_ORDER.slice().sort((a,b) => (distribution[b]||0) - (distribution[a]||0));
+  c.innerHTML = sorted.map(e => {
+    const pct = (distribution[e] || 0).toFixed(1);
+    const color = EMOTION_COLORS_JS[e] || '#888';
+    return `
+      <div class="emotion-bar-row">
+        <div class="emotion-bar-label">${EMOJIS[e]||''} ${e}</div>
+        <div class="emotion-bar-track">
+          <div class="emotion-bar-fill" style="width:${pct}%; background:${color};"></div>
+        </div>
+        <div class="emotion-bar-pct">${pct}%</div>
+      </div>`;
+  }).join('');
+}
+
+// ── Load Snapshots ────────────────────────────────────────────────────────────
+async function loadSnapshots() {
+  const grid = document.getElementById('snapshotGrid');
+  try {
+    const res = await fetch('/api/snapshots');
+    const snaps = await res.json();
+    if (!snaps.length) { grid.innerHTML = '<div class="text-muted text-xs">No snapshots yet.</div>'; return; }
+    grid.innerHTML = snaps.map(s => `
+      <div class="snapshot-item">
+        <img src="${s.url}" alt="Snapshot" loading="lazy"/>
+        <div class="snapshot-overlay">
+          <a href="${s.url}" download class="btn btn-primary btn-sm">⬇</a>
+        </div>
+      </div>`).join('');
+  } catch(e) { grid.innerHTML = '<div class="text-muted text-xs">Failed to load.</div>'; }
+}
+
+// ── Load Session ──────────────────────────────────────────────────────────────
+let donutChartInst = null, timelineChartInst = null, currentSessionId = null;
+
+async function loadSession(sid) {
+  document.querySelectorAll('.session-item').forEach(el => el.classList.remove('active'));
+  const el = document.querySelector(`[data-id="${sid}"]`);
+  if (el) el.classList.add('active');
+
+  currentSessionId = sid;
+  document.getElementById('noSessionMsg').style.display = 'none';
+  const analyticsDiv = document.getElementById('sessionAnalytics');
+  analyticsDiv.style.display = 'flex';
+
+  try {
+    const res = await fetch(`/api/session/${sid}`);
+    const data = await res.json();
+
+    // Header
+    document.getElementById('detailId').textContent = '#' + sid;
+    document.getElementById('detailTime').textContent =
+      (data.start_time||'').slice(0,19).replace('T',' ') + ' → ' +
+      (data.end_time||'—').slice(0,19).replace('T',' ');
+
+    const sum = data.summary || {};
+    const dom = sum.dominant || 'neutral';
+    document.getElementById('detailEmoji').textContent = EMOJIS[dom] || '😐';
+    document.getElementById('detailDominant').textContent = dom.charAt(0).toUpperCase()+dom.slice(1);
+    document.getElementById('detailFrames').textContent = sum.total_frames || data.emotion_log?.length || 0;
+    document.getElementById('detailPositive').textContent = (sum.positive_pct||0).toFixed(1) + '%';
+    document.getElementById('detailNegative').textContent = (sum.negative_pct||0).toFixed(1) + '%';
+    document.getElementById('detailMoodText').textContent = sum.mood_text || '—';
+
+    // Stress alert
+    const stressEl = document.getElementById('analyticsStressAlert');
+    if (data.stress_alert) stressEl.classList.add('visible');
+    else stressEl.classList.remove('visible');
+
+    // Destroy old charts
+    if (donutChartInst) { donutChartInst.destroy(); donutChartInst = null; }
+    if (timelineChartInst) { timelineChartInst.destroy(); timelineChartInst = null; }
+
+    // Donut chart
+    const dist = data.distribution || {};
+    donutChartInst = initDonutChart('donutCanvas', dist);
+
+    // Timeline chart
+    timelineChartInst = initSessionTimeline('sessionTimelineCanvas', data.timeline);
+
+    // Emotion bars
+    buildEmotionBars('analyticsEmotionBars', dist);
+
+    // PDF & CSV buttons
+    document.getElementById('btnExportPDF').onclick = () => {
+      window.location.href = `/api/export_pdf/${sid}`;
+      showToast('📄 Generating PDF report…', 'info');
+    };
+    document.getElementById('btnExportCSV').onclick = () => {
+      window.location.href = `/api/export_csv/${sid}`;
+      showToast('📥 Downloading session CSV data…', 'info');
+    };
+
+  } catch(e) {
+    showToast('Failed to load session data.', 'error');
+  }
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+loadSnapshots();
+
+// Auto load session from URL query parameter ?session=<id>
+const urlParams = new URLSearchParams(window.location.search);
+const targetSid = urlParams.get('session');
+if (targetSid) {
+  loadSession(targetSid);
+}
+</script>
+</body>
+</html>

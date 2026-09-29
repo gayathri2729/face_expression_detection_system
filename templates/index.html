@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FaceIQ – Real-Time Face Expression Detection</title>
+  <meta name="description" content="Professional AI-powered real-time face expression detection system. Detect 7 emotions instantly with multi-face support, analytics, and mood reports." />
+  <link rel="stylesheet" href="/static/css/style.css" />
+</head>
+<body>
+
+<!-- ── Navbar ─────────────────────────────────────────────────────────────────── -->
+<nav class="navbar">
+  <div class="nav-brand">
+    <a href="/" style="text-decoration:none; display:flex; align-items:center; gap:8px; color:inherit;">
+      <span class="logo-icon">🎭</span> FaceIQ
+    </a>
+  </div>
+  <div class="nav-links">
+    <a href="/" class="nav-link active">Home</a>
+    <a href="/dashboard" class="nav-link">Dashboard</a>
+    <a href="/history" class="nav-link">History</a>
+    <a href="/analytics" class="nav-link">Analytics</a>
+    <a href="/photo_analyzer" class="nav-link">Photo AI</a>
+  </div>
+  <div class="nav-actions">
+    {% if current_user.is_authenticated %}
+    <div class="nav-auth">
+      <a href="/profile" class="user-badge">
+        <span class="user-avatar-icon">{{ current_user.avatar or '🎭' }}</span>
+        <span>{{ current_user.username }}</span>
+      </a>
+      <a href="/logout" class="nav-logout">Log out</a>
+    </div>
+    {% else %}
+    <div class="flex gap-2">
+      <a href="/login" class="btn btn-secondary btn-sm">Sign in</a>
+      <a href="/register" class="btn btn-primary btn-sm">Get Started</a>
+    </div>
+    {% endif %}
+    <button class="theme-toggle" id="themeToggle" title="Toggle theme">🌙</button>
+  </div>
+</nav>
+
+<!-- ── Hero ───────────────────────────────────────────────────────────────────── -->
+<section class="hero">
+  <div class="hero-bg-orb orb-1"></div>
+  <div class="hero-bg-orb orb-2"></div>
+  <div class="hero-bg-orb orb-3"></div>
+
+  <div class="hero-content">
+    <div class="hero-tag">
+      <span>🤖</span> Real-World AI Vision &amp; Deep Emotion Intelligence
+    </div>
+
+    <h1 class="hero-title">
+      Detect <span class="highlight">Human Emotions</span><br/>
+      in Real Time
+    </h1>
+
+    <p class="hero-description">
+      A comprehensive AI face expression detection platform. Stream webcam feed at 30fps,
+      analyze portraits &amp; group photos, manage personal session history, export PDF reports &amp; CSV datasets,
+      and track stress levels with intelligent alerts.
+    </p>
+
+    <div class="hero-actions">
+      <a href="/dashboard" class="btn btn-primary btn-lg">
+        🚀 Launch Live Dashboard
+      </a>
+      <a href="/photo_analyzer" class="btn btn-secondary btn-lg">
+        🖼️ Upload &amp; Analyze Photo
+      </a>
+      <a href="/history" class="btn btn-secondary btn-lg">
+        🗂️ View History
+      </a>
+    </div>
+
+    <div class="hero-stats">
+      <div class="stat-item">
+        <div class="stat-value">7</div>
+        <div class="stat-label">Emotions Detected</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">30fps</div>
+        <div class="stat-label">Real-Time Stream</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">Multi</div>
+        <div class="stat-label">Face Support</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">PDF</div>
+        <div class="stat-label">Mood Reports</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Features Section ───────────────────────────────────────────────────────── -->
+<section class="features-section">
+  <div style="text-align:center; margin-bottom: 1rem;">
+    <span class="badge badge-purple">✨ Features</span>
+  </div>
+  <h2 class="section-title" style="text-align:center;">
+    Everything You Need for<br/><span class="highlight">Professional Emotion Analysis</span>
+  </h2>
+
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="feature-icon">🎭</div>
+      <div class="feature-title">7-Emotion Detection</div>
+      <div class="feature-desc">Identifies happy, sad, angry, fear, disgust, surprise, and neutral with high accuracy using DeepFace neural networks.</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">👥</div>
+      <div class="feature-title">Multi-Face Support</div>
+      <div class="feature-desc">Simultaneously analyzes multiple faces in a single frame, each with individual emotion detection and confidence scores.</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">📡</div>
+      <div class="feature-title">Live Streaming</div>
+      <div class="feature-desc">Real-time webcam feed with annotated overlays — bounding boxes, emotion labels, and confidence bars at 30fps.</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">📊</div>
+      <div class="feature-title">Live Analytics</div>
+      <div class="feature-desc">Rolling timeline charts and confidence bar chart update live during each session for instant visual feedback.</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">📸</div>
+      <div class="feature-title">Snapshot Gallery</div>
+      <div class="feature-desc">Capture annotated frames at any moment and download them from a visual gallery in the analytics page.</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">📄</div>
+      <div class="feature-title">PDF Mood Reports</div>
+      <div class="feature-desc">Export a professional PDF report per session with emotion distribution charts, mood summary, and statistics.</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🚨</div>
+      <div class="feature-title">Stress Alerts</div>
+      <div class="feature-desc">Automatic alert when negative emotions (angry, fear, sad, disgust) exceed 50% — helps promote wellbeing.</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🗂</div>
+      <div class="feature-title">Session History</div>
+      <div class="feature-desc">All sessions are persistently stored with timestamps, emotion logs, and mood summaries for later review.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ── CTA ────────────────────────────────────────────────────────────────────── -->
+<section style="text-align:center; padding: 4rem 2rem; background: var(--bg-secondary);">
+  <h2 class="section-title"><span class="highlight">Start Detecting</span> Now</h2>
+  <p class="text-muted" style="font-size:1rem; margin-bottom: 2rem; max-width: 500px; margin-left: auto; margin-right: auto;">
+    Open the dashboard, allow webcam access, and start a session — it's that simple.
+  </p>
+  <a href="/dashboard" class="btn btn-primary btn-lg">
+    🎯 Open Dashboard
+  </a>
+</section>
+
+<!-- ── Footer ─────────────────────────────────────────────────────────────────── -->
+<footer style="text-align:center; padding: 2rem; border-top: 1px solid var(--border); color: var(--text-muted); font-size: 0.85rem;">
+  🎭 FaceIQ — Real-World Face Expression Detection System &nbsp;|&nbsp; Powered by DeepFace + OpenCV
+</footer>
+
+<script>
+  // Theme toggle
+  const toggle = document.getElementById('themeToggle');
+  const saved = localStorage.getItem('theme') || 'dark';
+  if (saved === 'light') { document.body.classList.add('light'); toggle.textContent = '☀️'; }
+  toggle.addEventListener('click', () => {
+    document.body.classList.toggle('light');
+    const isLight = document.body.classList.contains('light');
+    toggle.textContent = isLight ? '☀️' : '🌙';
+    localStorage.setItem('theme', isLight ? 'light' : 'dark');
+  });
+</script>
+</body>
+</html>

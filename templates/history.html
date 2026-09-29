@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>FaceIQ – Session History</title>
+  <meta name="description" content="View, search, filter and export your complete history of face expression detection sessions."/>
+  <link rel="stylesheet" href="/static/css/style.css"/>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="nav-brand">
+    <a href="/" style="text-decoration:none; display:flex; align-items:center; gap:8px; color:inherit;">
+      <span class="logo-icon">🎭</span> FaceIQ
+    </a>
+  </div>
+  <div class="nav-links">
+    <a href="/" class="nav-link">Home</a>
+    <a href="/dashboard" class="nav-link">Dashboard</a>
+    <a href="/history" class="nav-link active">History</a>
+    <a href="/analytics" class="nav-link">Analytics</a>
+    <a href="/photo_analyzer" class="nav-link">Photo AI</a>
+  </div>
+  <div class="nav-actions">
+    {% if current_user.is_authenticated %}
+    <div class="nav-auth">
+      <a href="/profile" class="user-badge" title="User Profile">
+        <span class="user-avatar-icon">{{ current_user.avatar or '🎭' }}</span>
+        <span>{{ current_user.username }}</span>
+      </a>
+      <a href="/logout" class="nav-logout" title="Log Out">Log out</a>
+    </div>
+    {% else %}
+    <a href="/login" class="btn btn-secondary btn-sm">Sign in</a>
+    {% endif %}
+    <button class="theme-toggle" id="themeToggle" title="Toggle theme">🌙</button>
+  </div>
+</nav>
+
+<div class="history-layout">
+
+  <!-- Header & Actions -->
+  <div class="flex items-center gap-4" style="justify-content:space-between; flex-wrap:wrap;">
+    <div>
+      <h1 class="section-title" style="margin-bottom:0.25rem;">
+        Session <span class="highlight">History &amp; Logs</span>
+      </h1>
+      <p class="text-muted">Review, filter, and export all recorded emotion detection sessions.</p>
+    </div>
+    <div class="flex gap-3 flex-wrap">
+      <a href="/dashboard" class="btn btn-primary">
+        ▶ Start New Session
+      </a>
+      <button class="btn btn-secondary" id="btnExportAllCsv" onclick="exportAllCsv()">
+        📥 Export All (CSV)
+      </button>
+    </div>
+  </div>
+
+  <!-- 4 Stats Cards -->
+  <div class="stats-grid-4">
+    <div class="stat-card-glass">
+      <div class="stat-card-icon" style="color:var(--accent-primary);">🗂️</div>
+      <div>
+        <div class="text-muted text-xs">TOTAL SESSIONS</div>
+        <div style="font-size:1.6rem; font-weight:800;" id="statTotalSessions">{{ sessions|length }}</div>
+      </div>
+    </div>
+    <div class="stat-card-glass">
+      <div class="stat-card-icon" style="color:var(--accent-secondary);">⏱️</div>
+      <div>
+        <div class="text-muted text-xs">TOTAL DURATION</div>
+        <div style="font-size:1.6rem; font-weight:800;" id="statTotalDuration">{{ total_duration_str }}</div>
+      </div>
+    </div>
+    <div class="stat-card-glass">
+      <div class="stat-card-icon" style="color:var(--accent-green);">😊</div>
+      <div>
+        <div class="text-muted text-xs">AVG POSITIVITY</div>
+        <div style="font-size:1.6rem; font-weight:800;" id="statAvgPositivity">{{ avg_positivity }}%</div>
+      </div>
+    </div>
+    <div class="stat-card-glass">
+      <div class="stat-card-icon" style="color:var(--accent-gold);">🏆</div>
+      <div>
+        <div class="text-muted text-xs">MOST COMMON MOOD</div>
+        <div style="font-size:1.4rem; font-weight:800; text-transform:capitalize;" id="statTopMood">{{ top_mood }}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Search & Filter Toolbar -->
+  <div class="history-toolbar">
+    <div class="flex items-center gap-3 flex-wrap">
+      <div style="position:relative;">
+        <span style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--text-muted);">🔍</span>
+        <input type="text" id="historySearch" class="history-search-input" placeholder="Search sessions, tags, mood…"/>
+      </div>
+
+      <!-- Emotion Filter Pills -->
+      <div class="flex gap-2 flex-wrap" id="emotionPills">
+        <button class="view-toggle-btn active" data-filter="all">All</button>
+        <button class="view-toggle-btn" data-filter="happy">😄 Happy</button>
+        <button class="view-toggle-btn" data-filter="neutral">😐 Neutral</button>
+        <button class="view-toggle-btn" data-filter="sad">😢 Sad</button>
+        <button class="view-toggle-btn" data-filter="surprise">😲 Surprise</button>
+        <button class="view-toggle-btn" data-filter="angry">😠 Angry</button>
+        <button class="view-toggle-btn" data-filter="fear">😨 Fear</button>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-3">
+      <!-- Sort Select -->
+      <select id="sortSelect" class="btn btn-secondary btn-sm" style="padding:6px 12px; cursor:pointer;">
+        <option value="newest">Newest First</option>
+        <option value="oldest">Oldest First</option>
+        <option value="duration">Longest Duration</option>
+        <option value="positivity">Highest Positivity</option>
+      </select>
+
+      <!-- Grid / Table View Switcher -->
+      <div class="flex gap-1" style="background:rgba(255,255,255,0.05); padding:3px; border-radius:var(--radius-sm); border:1px solid var(--border);">
+        <button class="view-toggle-btn active" id="btnViewGrid" title="Card Grid View">▦</button>
+        <button class="view-toggle-btn" id="btnViewTable" title="Table View">☰</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Session List Container -->
+  {% if sessions %}
+  <!-- GRID VIEW -->
+  <div class="session-cards-grid" id="gridContainer">
+    {% for s in sessions %}
+    <div class="history-card" data-id="{{ s.id }}" data-dominant="{{ s.dominant }}" data-title="{{ s.title }}" data-mood="{{ s.mood_text }}" data-pos="{{ s.positive_pct }}" data-dur="{{ s.duration_seconds }}">
+      <div class="history-card-header">
+        <div>
+          <div class="flex items-center gap-2 mb-1">
+            <span class="badge badge-purple">#{{ s.id }}</span>
+            <span class="badge badge-cyan">{{ s.category or 'General' }}</span>
+            {% if s.stress_alert %}
+            <span class="badge badge-red">🚨 Stress Alert</span>
+            {% endif %}
+          </div>
+          <div class="history-card-title">{{ s.title or 'Emotion Session' }}</div>
+          <div class="history-card-meta">
+            <span>📅 {{ (s.start_time or '')[:19] | replace('T', ' ') }}</span>
+            <span>⏱️ {{ s.get('formatted_duration') or (((s.get('duration_seconds') or 0) // 60)|string + 'm ' + ((s.get('duration_seconds') or 0) % 60)|string + 's') }}</span>
+          </div>
+        </div>
+        <div style="font-size:2.2rem; text-align:center;">
+          {% if s.dominant == 'happy' %}😄
+          {% elif s.dominant == 'sad' %}😢
+          {% elif s.dominant == 'angry' %}😠
+          {% elif s.dominant == 'surprise' %}😲
+          {% elif s.dominant == 'fear' %}😨
+          {% elif s.dominant == 'disgust' %}🤢
+          {% else %}😐{% endif %}
+        </div>
+      </div>
+
+      <div class="history-card-body">
+        <div style="margin-bottom:0.75rem;">
+          <div class="flex items-center justify-between text-xs text-muted mb-1">
+            <span>Dominant: <strong class="emo-{{ s.dominant }}">{{ s.dominant|capitalize }}</strong></span>
+            <span>Frames: {{ s.total_frames }}</span>
+          </div>
+          <!-- Positivity progress bar -->
+          <div style="height:6px; background:rgba(255,255,255,0.08); border-radius:3px; overflow:hidden; display:flex;">
+            <div style="width:{{ s.positive_pct or 0 }}%; background:var(--accent-green);" title="Positive {{ s.positive_pct or 0 }}%"></div>
+            <div style="width:{{ s.negative_pct or 0 }}%; background:var(--accent-red);" title="Negative {{ s.negative_pct or 0 }}%"></div>
+          </div>
+          <div class="flex justify-between text-xs text-muted mt-1">
+            <span style="color:var(--accent-green);">😊 {{ s.positive_pct or 0 }}% pos</span>
+            <span style="color:var(--accent-red);">😟 {{ s.negative_pct or 0 }}% neg</span>
+          </div>
+        </div>
+
+        {% if s.notes %}
+        <p class="text-muted text-xs truncate" style="margin-bottom:0.5rem;" title="{{ s.notes }}">
+          📝 {{ s.notes }}
+        </p>
+        {% endif %}
+
+        {% if s.snapshots and s.snapshots|length > 0 %}
+        <div class="text-xs text-muted mb-2">
+          📸 {{ s.snapshots|length }} snapshot(s) captured
+        </div>
+        {% endif %}
+
+        <div style="font-size:0.85rem; padding:8px 12px; border-radius:var(--radius-sm); background:rgba(108,99,255,0.08); border:1px solid rgba(108,99,255,0.2);">
+          {{ s.mood_text or 'Session recorded successfully.' }}
+        </div>
+      </div>
+
+      <div class="history-card-actions">
+        <a href="/analytics?session={{ s.id }}" class="btn btn-secondary btn-sm" title="Deep Analytics">
+          📊 Analytics
+        </a>
+        <a href="/api/export_pdf/{{ s.id }}" class="btn btn-gold btn-sm" title="Download PDF Mood Report">
+          📄 PDF
+        </a>
+        <a href="/api/export_csv/{{ s.id }}" class="btn btn-secondary btn-sm" title="Export Raw CSV Data">
+          📥 CSV
+        </a>
+        <button class="btn btn-danger btn-sm" onclick="promptDelete('{{ s.id }}')" title="Delete Session" style="margin-left:auto;">
+          🗑
+        </button>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- TABLE VIEW (Hidden by default) -->
+  <div class="history-table-wrapper" id="tableContainer" style="display:none;">
+    <table class="history-table">
+      <thead>
+        <tr>
+          <th>Session ID</th>
+          <th>Date &amp; Time</th>
+          <th>Category</th>
+          <th>Duration</th>
+          <th>Dominant Mood</th>
+          <th>Positivity</th>
+          <th>Frames</th>
+          <th>Snapshots</th>
+          <th style="text-align:right;">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in sessions %}
+        <tr data-id="{{ s.id }}" data-dominant="{{ s.dominant }}" data-title="{{ s.title }}" data-mood="{{ s.mood_text }}" data-pos="{{ s.positive_pct }}" data-dur="{{ s.duration_seconds }}">
+          <td><span class="badge badge-purple">#{{ s.id }}</span></td>
+          <td>{{ (s.start_time or '')[:19] | replace('T', ' ') }}</td>
+          <td><span class="badge badge-cyan">{{ s.category or 'General' }}</span></td>
+          <td>{{ s.get('formatted_duration') or (((s.get('duration_seconds') or 0) // 60)|string + 'm ' + ((s.get('duration_seconds') or 0) % 60)|string + 's') }}</td>
+          <td>
+            <span class="font-semibold emo-{{ s.dominant }}">
+              {% if s.dominant == 'happy' %}😄
+              {% elif s.dominant == 'sad' %}😢
+              {% elif s.dominant == 'angry' %}😠
+              {% elif s.dominant == 'surprise' %}😲
+              {% elif s.dominant == 'fear' %}😨
+              {% elif s.dominant == 'disgust' %}🤢
+              {% else %}😐{% endif %}
+              {{ s.dominant|capitalize }}
+            </span>
+          </td>
+          <td>
+            <span style="color:var(--accent-green); font-weight:600;">{{ s.positive_pct or 0 }}%</span>
+          </td>
+          <td>{{ s.total_frames or 0 }}</td>
+          <td>{{ (s.snapshots or [])|length }}</td>
+          <td style="text-align:right;">
+            <div class="flex gap-2" style="justify-content:flex-end;">
+              <a href="/analytics?session={{ s.id }}" class="btn btn-secondary btn-sm" title="Analytics">📊</a>
+              <a href="/api/export_pdf/{{ s.id }}" class="btn btn-gold btn-sm" title="PDF">📄</a>
+              <a href="/api/export_csv/{{ s.id }}" class="btn btn-secondary btn-sm" title="CSV">📥</a>
+              <button class="btn btn-danger btn-sm" onclick="promptDelete('{{ s.id }}')" title="Delete">🗑</button>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% else %}
+  <!-- Empty State -->
+  <div class="card" style="text-align:center; padding:4rem 2rem;">
+    <div style="font-size:3.5rem; margin-bottom:1rem;">📭</div>
+    <h2 class="section-title" style="font-size:1.5rem; margin-bottom:0.5rem;">No Sessions Recorded Yet</h2>
+    <p class="text-muted" style="max-width:480px; margin:0 auto 1.5rem auto;">
+      Start your first session on the Live Dashboard to begin tracking emotions, stress alerts, and real-time expressions.
+    </p>
+    <a href="/dashboard" class="btn btn-primary btn-lg">
+      🚀 Launch Live Dashboard
+    </a>
+  </div>
+  {% endif %}
+
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal-overlay" id="deleteModal">
+  <div class="modal-box">
+    <div style="font-size:2.5rem; text-align:center; margin-bottom:0.5rem;">🗑️</div>
+    <h3 style="text-align:center; font-size:1.25rem; margin-bottom:0.5rem;">Delete Session</h3>
+    <p class="text-muted" style="text-align:center; margin-bottom:1.5rem;">
+      Are you sure you want to delete session <strong id="deleteTargetId" class="highlight">#—</strong>? This action cannot be undone.
+    </p>
+    <div class="flex gap-3" style="justify-content:center;">
+      <button class="btn btn-secondary" onclick="closeDeleteModal()">Cancel</button>
+      <button class="btn btn-danger" id="btnConfirmDelete" onclick="executeDelete()">Yes, Delete</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+  // Theme toggle
+  const themeToggle = document.getElementById('themeToggle');
+  (function() {
+    const saved = localStorage.getItem('theme') || 'dark';
+    if (saved === 'light') { document.body.classList.add('light'); themeToggle.textContent = '☀️'; }
+  })();
+  themeToggle.addEventListener('click', () => {
+    document.body.classList.toggle('light');
+    const isLight = document.body.classList.contains('light');
+    themeToggle.textContent = isLight ? '☀️' : '🌙';
+    localStorage.setItem('theme', isLight ? 'light' : 'dark');
+  });
+
+  // Toast
+  function showToast(msg, type='info') {
+    const tc = document.getElementById('toastContainer');
+    const t = document.createElement('div');
+    t.className = `toast ${type}`;
+    t.innerHTML = `<span>${msg}</span>`;
+    tc.appendChild(t);
+    setTimeout(() => { t.classList.add('toast-out'); setTimeout(() => t.remove(), 300); }, 3500);
+  }
+
+  // View toggle
+  const btnViewGrid = document.getElementById('btnViewGrid');
+  const btnViewTable = document.getElementById('btnViewTable');
+  const gridContainer = document.getElementById('gridContainer');
+  const tableContainer = document.getElementById('tableContainer');
+
+  if (btnViewGrid && btnViewTable) {
+    btnViewGrid.addEventListener('click', () => {
+      btnViewGrid.classList.add('active');
+      btnViewTable.classList.remove('active');
+      if (gridContainer) gridContainer.style.display = 'grid';
+      if (tableContainer) tableContainer.style.display = 'none';
+    });
+    btnViewTable.addEventListener('click', () => {
+      btnViewTable.classList.add('active');
+      btnViewGrid.classList.remove('active');
+      if (gridContainer) gridContainer.style.display = 'none';
+      if (tableContainer) tableContainer.style.display = 'block';
+    });
+  }
+
+  // Search & Filter
+  const searchInput = document.getElementById('historySearch');
+  const pills = document.querySelectorAll('#emotionPills button');
+  let currentFilter = 'all';
+
+  pills.forEach(pill => {
+    pill.addEventListener('click', () => {
+      pills.forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      currentFilter = pill.dataset.filter;
+      applyFilters();
+    });
+  });
+
+  if (searchInput) {
+    searchInput.addEventListener('input', applyFilters);
+  }
+
+  function applyFilters() {
+    const q = (searchInput ? searchInput.value : '').toLowerCase().trim();
+    const items = document.querySelectorAll('.history-card, .history-table tbody tr');
+
+    items.forEach(item => {
+      const dom = (item.dataset.dominant || '').toLowerCase();
+      const title = (item.dataset.title || '').toLowerCase();
+      const mood = (item.dataset.mood || '').toLowerCase();
+      const id = (item.dataset.id || '').toLowerCase();
+
+      const matchesFilter = (currentFilter === 'all' || dom === currentFilter);
+      const matchesSearch = !q || title.includes(q) || mood.includes(q) || id.includes(q) || dom.includes(q);
+
+      if (matchesFilter && matchesSearch) {
+        item.style.display = '';
+      } else {
+        item.style.display = 'none';
+      }
+    });
+  }
+
+  // Sort
+  const sortSelect = document.getElementById('sortSelect');
+  if (sortSelect) {
+    sortSelect.addEventListener('change', () => {
+      const mode = sortSelect.value;
+      const grid = document.getElementById('gridContainer');
+      const tbody = document.querySelector('.history-table tbody');
+
+      if (grid) {
+        const cards = Array.from(grid.querySelectorAll('.history-card'));
+        sortElements(cards, mode);
+        cards.forEach(c => grid.appendChild(c));
+      }
+      if (tbody) {
+        const rows = Array.from(tbody.querySelectorAll('tr'));
+        sortElements(rows, mode);
+        rows.forEach(r => tbody.appendChild(r));
+      }
+    });
+  }
+
+  function sortElements(elements, mode) {
+    elements.sort((a, b) => {
+      if (mode === 'newest') return (b.dataset.id || '').localeCompare(a.dataset.id || '');
+      if (mode === 'oldest') return (a.dataset.id || '').localeCompare(b.dataset.id || '');
+      if (mode === 'duration') return parseFloat(b.dataset.dur || 0) - parseFloat(a.dataset.dur || 0);
+      if (mode === 'positivity') return parseFloat(b.dataset.pos || 0) - parseFloat(a.dataset.pos || 0);
+      return 0;
+    });
+  }
+
+  // Delete Modal
+  let targetSessionId = null;
+  function promptDelete(sid) {
+    targetSessionId = sid;
+    document.getElementById('deleteTargetId').textContent = '#' + sid;
+    document.getElementById('deleteModal').classList.add('open');
+  }
+
+  function closeDeleteModal() {
+    targetSessionId = null;
+    document.getElementById('deleteModal').classList.remove('open');
+  }
+
+  async function executeDelete() {
+    if (!targetSessionId) return;
+    try {
+      const res = await fetch(`/api/session/${targetSessionId}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        showToast(`🗑 Session #${targetSessionId} deleted`, 'success');
+        document.querySelectorAll(`[data-id="${targetSessionId}"]`).forEach(el => el.remove());
+        closeDeleteModal();
+      } else {
+        showToast(data.error || 'Failed to delete session', 'error');
+      }
+    } catch(e) {
+      showToast('Error deleting session', 'error');
+    }
+  }
+
+  // Export all CSV
+  function exportAllCsv() {
+    window.location.href = '/api/export_all_csv';
+    showToast('📥 Preparing all session history CSV…', 'info');
+  }
+</script>
+</body>
+</html>

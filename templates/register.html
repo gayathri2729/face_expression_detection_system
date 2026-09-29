@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>FaceIQ – Register</title>
+  <meta name="description" content="Create a new FaceIQ account to track and analyze human emotions in real time."/>
+  <link rel="stylesheet" href="/static/css/style.css"/>
+  <style>
+    .strength-bar {
+      height: 4px; border-radius: 2px; background: rgba(255,255,255,0.1);
+      margin-top: 6px; overflow: hidden; transition: all 0.3s ease;
+    }
+    .strength-fill {
+      height: 100%; width: 0%; transition: all 0.3s ease;
+    }
+  </style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="nav-brand">
+    <a href="/" style="text-decoration:none; display:flex; align-items:center; gap:8px; color:inherit;">
+      <span class="logo-icon">🎭</span> FaceIQ
+    </a>
+  </div>
+  <div class="nav-links">
+    <a href="/" class="nav-link">Home</a>
+    <a href="/login" class="nav-link">Login</a>
+    <a href="/register" class="nav-link active">Register</a>
+  </div>
+  <div class="nav-actions">
+    <button class="theme-toggle" id="themeToggle" title="Toggle theme">🌙</button>
+  </div>
+</nav>
+
+<div class="auth-wrapper">
+  <div class="hero-bg-orb orb-1"></div>
+  <div class="hero-bg-orb orb-2"></div>
+
+  <div class="auth-card" style="max-width: 480px;">
+    <div class="auth-header">
+      <div class="auth-icon">✨</div>
+      <h1 class="auth-title">Create Account</h1>
+      <p class="auth-subtitle">Join FaceIQ Emotion Detection Platform</p>
+    </div>
+
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div style="padding:10px 14px; border-radius:var(--radius-md); margin-bottom:1.25rem; font-size:0.88rem;
+               background:{% if category=='error' %}rgba(255,71,87,0.15){% elif category=='success' %}rgba(0,255,136,0.15){% else %}rgba(0,212,255,0.15){% endif %};
+               border:1px solid {% if category=='error' %}var(--accent-red){% elif category=='success' %}var(--accent-green){% else %}var(--accent-secondary){% endif %};
+               color:{% if category=='error' %}var(--accent-red){% elif category=='success' %}var(--accent-green){% else %}var(--accent-secondary){% endif %};">
+            {{ message }}
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <form method="POST" action="/register" id="registerForm">
+      <div class="form-group">
+        <label class="form-label" for="full_name">Full Name</label>
+        <div class="input-group">
+          <span class="input-icon">👤</span>
+          <input type="text" id="full_name" name="full_name" class="input-control" placeholder="e.g. John Doe" required autofocus/>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="username">Username</label>
+        <div class="input-group">
+          <span class="input-icon">⚡</span>
+          <input type="text" id="username" name="username" class="input-control" placeholder="Choose a username" required pattern="^[a-zA-Z0-9_]{3,20}$" title="3-20 letters, numbers or underscore"/>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="email">Email Address</label>
+        <div class="input-group">
+          <span class="input-icon">✉️</span>
+          <input type="email" id="email" name="email" class="input-control" placeholder="name@example.com" required/>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="password">Password</label>
+        <div class="input-group">
+          <span class="input-icon">🔒</span>
+          <input type="password" id="password" name="password" class="input-control" placeholder="At least 6 characters" minlength="6" required/>
+          <button type="button" class="password-toggle" id="togglePassword">👁️</button>
+        </div>
+        <div class="strength-bar"><div class="strength-fill" id="strengthFill"></div></div>
+        <div class="text-xs text-muted mt-2" id="strengthText">Password strength</div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="confirm_password">Confirm Password</label>
+        <div class="input-group">
+          <span class="input-icon">🔐</span>
+          <input type="password" id="confirm_password" name="confirm_password" class="input-control" placeholder="Re-enter password" required/>
+        </div>
+        <div class="text-xs text-muted mt-2" id="matchText"></div>
+      </div>
+
+      <div class="mb-4">
+        <label class="flex items-center gap-2" style="font-size:0.85rem; color:var(--text-secondary); cursor:pointer;">
+          <input type="checkbox" required style="accent-color:var(--accent-primary);"/>
+          I agree to the Terms of Service &amp; Privacy Policy
+        </label>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-lg w-full" id="btnRegisterSubmit">
+        ✨ Create Account
+      </button>
+    </form>
+
+    <div class="auth-footer">
+      Already have an account? <a href="/login">Sign in</a>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Theme toggle
+  const themeToggle = document.getElementById('themeToggle');
+  (function() {
+    const saved = localStorage.getItem('theme') || 'dark';
+    if (saved === 'light') { document.body.classList.add('light'); themeToggle.textContent = '☀️'; }
+  })();
+  themeToggle.addEventListener('click', () => {
+    document.body.classList.toggle('light');
+    const isLight = document.body.classList.contains('light');
+    themeToggle.textContent = isLight ? '☀️' : '🌙';
+    localStorage.setItem('theme', isLight ? 'light' : 'dark');
+  });
+
+  // Password toggle
+  const toggleBtn = document.getElementById('togglePassword');
+  const passInput = document.getElementById('password');
+  toggleBtn.addEventListener('click', () => {
+    const isPass = passInput.type === 'password';
+    passInput.type = isPass ? 'text' : 'password';
+    toggleBtn.textContent = isPass ? '🙈' : '👁️';
+  });
+
+  // Password Strength Meter
+  const strengthFill = document.getElementById('strengthFill');
+  const strengthText = document.getElementById('strengthText');
+  passInput.addEventListener('input', () => {
+    const val = passInput.value;
+    let score = 0;
+    if (val.length >= 6) score += 25;
+    if (val.length >= 10) score += 25;
+    if (/[A-Z]/.test(val) && /[a-z]/.test(val)) score += 25;
+    if (/[0-9]/.test(val) || /[^A-Za-z0-9]/.test(val)) score += 25;
+
+    strengthFill.style.width = score + '%';
+    if (score < 50) {
+      strengthFill.style.background = 'var(--accent-red)';
+      strengthText.textContent = 'Weak password';
+      strengthText.style.color = 'var(--accent-red)';
+    } else if (score < 75) {
+      strengthFill.style.background = 'var(--accent-orange)';
+      strengthText.textContent = 'Medium password';
+      strengthText.style.color = 'var(--accent-orange)';
+    } else {
+      strengthFill.style.background = 'var(--accent-green)';
+      strengthText.textContent = 'Strong password';
+      strengthText.style.color = 'var(--accent-green)';
+    }
+  });
+
+  // Password Match Check
+  const confirmInput = document.getElementById('confirm_password');
+  const matchText = document.getElementById('matchText');
+  function checkMatch() {
+    if (!confirmInput.value) { matchText.textContent = ''; return; }
+    if (confirmInput.value === passInput.value) {
+      matchText.textContent = '✓ Passwords match';
+      matchText.style.color = 'var(--accent-green)';
+    } else {
+      matchText.textContent = '✗ Passwords do not match';
+      matchText.style.color = 'var(--accent-red)';
+    }
+  }
+  confirmInput.addEventListener('input', checkMatch);
+  passInput.addEventListener('input', checkMatch);
+</script>
+</body>
+</html>

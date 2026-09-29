@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>FaceIQ – Live Dashboard</title>
+  <link rel="stylesheet" href="/static/css/style.css"/>
+  <style>
+    .positivity-meter {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 1rem; border-radius: var(--radius-lg);
+      background: rgba(255,255,255,0.03); border: 1px solid var(--border);
+      margin-bottom: 1rem;
+    }
+    .positivity-value {
+      font-size: 2.2rem; font-weight: 800;
+      background: var(--gradient-accent);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .source-pill-group {
+      display: flex; gap: 4px; background: rgba(255,255,255,0.06);
+      padding: 3px; border-radius: var(--radius-sm); border: 1px solid var(--border);
+    }
+    .source-pill {
+      padding: 4px 10px; font-size: 0.78rem; font-weight: 600;
+      border: none; background: none; color: var(--text-secondary);
+      border-radius: 4px; cursor: pointer; transition: all 0.2s;
+    }
+    .source-pill.active {
+      background: var(--accent-primary); color: #fff;
+    }
+    #browserCamVideo {
+      width: 100%; border-radius: var(--radius-lg); display: none; object-fit: cover;
+    }
+  </style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="nav-brand">
+    <a href="/" style="text-decoration:none; display:flex; align-items:center; gap:8px; color:inherit;">
+      <span class="logo-icon">🎭</span> FaceIQ
+    </a>
+  </div>
+  <div class="nav-links">
+    <a href="/" class="nav-link">Home</a>
+    <a href="/dashboard" class="nav-link active">Dashboard</a>
+    <a href="/history" class="nav-link">History</a>
+    <a href="/analytics" class="nav-link">Analytics</a>
+    <a href="/photo_analyzer" class="nav-link">Photo AI</a>
+  </div>
+  <div class="nav-actions">
+    {% if current_user.is_authenticated %}
+    <div class="nav-auth">
+      <a href="/profile" class="user-badge" title="Profile &amp; Settings">
+        <span class="user-avatar-icon">{{ current_user.avatar or '🎭' }}</span>
+        <span>{{ current_user.username }}</span>
+      </a>
+      <a href="/logout" class="nav-logout">Log out</a>
+    </div>
+    {% else %}
+    <a href="/login" class="btn btn-secondary btn-sm">Sign in</a>
+    {% endif %}
+    <button class="theme-toggle" id="themeToggle" title="Toggle theme">🌙</button>
+  </div>
+</nav>
+
+<div class="dashboard-layout">
+  <!-- ── LEFT COLUMN ──────────────────────────────────────────────────────── -->
+  <div class="dashboard-left">
+
+    <!-- Stress Alert Banner -->
+    <div class="stress-alert" id="stressAlert">
+      <div class="flex items-center justify-between w-full">
+        <div>
+          🚨 <strong>High Stress Detected!</strong> &nbsp; Negative emotions exceed threshold. Consider taking a breather.
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="dismissStressAlert()" style="padding:2px 8px; font-size:0.75rem;">✕ Dismiss</button>
+      </div>
+    </div>
+
+    <!-- Video Feed Card -->
+    <div class="card">
+      <div class="card-header">
+        <div class="flex items-center gap-3">
+          <div class="card-title">
+            📹 Live Emotion Stream
+            <span class="badge badge-green badge-live" id="liveBadge">● LIVE</span>
+          </div>
+        </div>
+
+        <!-- Video Source Switcher -->
+        <div class="flex items-center gap-3">
+          <div class="source-pill-group">
+            <button class="source-pill active" id="btnModeOpenCV" onclick="setCameraMode('opencv')">Device Webcam</button>
+            <button class="source-pill" id="btnModeBrowser" onclick="setCameraMode('browser')">Browser Cam</button>
+          </div>
+          <div class="face-count-badge" id="faceCountBadge">
+            👤 <span id="faceCount">0</span> face(s)
+          </div>
+        </div>
+      </div>
+
+      <div class="card-body" style="padding: 0; background:#070714;">
+        <div class="video-wrapper" id="videoWrapper">
+          <!-- Backend OpenCV Stream -->
+          <img id="videoFeed" class="video-feed" src="/video_feed" alt="Live AI Feed"/>
+
+          <!-- Client-side Browser Webcam & Hidden Canvas for Frame Processing -->
+          <video id="browserCamVideo" autoplay playsinline muted></video>
+          <canvas id="browserCamCanvas" style="display:none;"></canvas>
+
+          <div class="video-overlay-badge">
+            <span class="badge badge-purple" id="connectionBadge">⚡ Connected</span>
+          </div>
+          <div class="video-recording-badge" id="recordingBadge">
+            <span class="badge badge-red">⏺ REC</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Session Controls Card -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">⚡ Session Management</div>
+        <div class="session-status">
+          <div class="session-dot" id="sessionDot"></div>
+          <span id="sessionStatus">Ready to record</span>
+        </div>
+      </div>
+      <div class="card-body">
+        <!-- Session Meta Inputs -->
+        <div class="flex gap-3 mb-3 flex-wrap">
+          <input type="text" id="sessionTitleInput" class="input-control" style="flex:2; min-width:180px; padding:8px 12px;" placeholder="Session title (e.g. Focus Session, Meeting)"/>
+          <select id="sessionCategorySelect" class="input-control" style="flex:1; min-width:130px; padding:8px 12px; cursor:pointer;">
+            <option value="General">General</option>
+            <option value="Work">Work</option>
+            <option value="Meeting">Meeting</option>
+            <option value="Study">Study</option>
+            <option value="Gaming">Gaming</option>
+            <option value="Relaxation">Relaxation</option>
+          </select>
+        </div>
+
+        <div class="session-controls">
+          <button class="btn btn-success" id="btnStart">▶ Start Session</button>
+          <button class="btn btn-danger" id="btnStop" disabled>⏹ Stop &amp; Save</button>
+          <button class="btn btn-secondary" id="btnSnapshot">📸 Take Snapshot</button>
+          <a href="/history" class="btn btn-secondary">🗂 View History</a>
+          <a href="/analytics" class="btn btn-secondary">📊 Analytics</a>
+        </div>
+        <div class="mt-3 text-muted" id="sessionInfo">Start a session to log expressions, stress changes, and create a report.</div>
+      </div>
+    </div>
+
+    <!-- Rolling Emotion Timeline Chart -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">📈 Real-Time Emotion Flow</div>
+        <span class="text-muted text-xs">Rolling live stream</span>
+      </div>
+      <div class="card-body">
+        <div class="chart-container" style="height:220px;">
+          <canvas id="timelineCanvas"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Snapshot Preview Card -->
+    <div class="card" id="snapshotCard" style="display:none;">
+      <div class="card-header">
+        <div class="card-title">📸 Last Captured Snapshot</div>
+        <a href="#" class="btn btn-secondary btn-sm" id="snapshotDownload" download>⬇ Download</a>
+      </div>
+      <div class="card-body" style="padding:0;">
+        <img id="snapshotImg" src="" alt="Snapshot" style="width:100%; border-radius:0 0 var(--radius-lg) var(--radius-lg); display:block;"/>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── RIGHT COLUMN ─────────────────────────────────────────────────────── -->
+  <div class="dashboard-right">
+
+    <!-- Dominant Emotion Display -->
+    <div class="dominant-display" id="dominantDisplay">
+      <div class="dominant-glow" id="dominantGlow"></div>
+      <div class="dominant-emoji" id="dominantEmoji">😐</div>
+      <div class="dominant-label" id="dominantLabel">neutral</div>
+      <div class="dominant-confidence" id="dominantConfidence">Waiting for detection…</div>
+    </div>
+
+    <!-- Positivity Index Gauge -->
+    <div class="positivity-meter">
+      <div class="text-xs text-muted mb-1" style="text-transform:uppercase; letter-spacing:0.5px;">Live Positivity Index</div>
+      <div class="positivity-value" id="positivityVal">0%</div>
+      <div class="text-xs text-muted" id="positivityDesc">Calm &amp; Neutral</div>
+    </div>
+
+    <!-- Emotion Confidence Bars -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">🎯 Emotion Probabilities</div>
+      </div>
+      <div class="card-body">
+        <div class="emotion-bars" id="emotionBars">
+          <!-- JS generated -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Multi-Face Info -->
+    <div class="card" id="multiFaceCard">
+      <div class="card-header">
+        <div class="card-title">👥 Multi-Face Analysis</div>
+      </div>
+      <div class="card-body">
+        <div id="multiFaceList" class="text-muted" style="font-size:0.88rem;">Scanning for faces in frame…</div>
+      </div>
+    </div>
+
+    <!-- Session Stats -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">📋 Active Metrics</div>
+      </div>
+      <div class="card-body">
+        <div class="flex-col gap-3">
+          <div class="flex items-center gap-3" style="justify-content:space-between;">
+            <span class="text-muted">Session ID</span>
+            <span class="font-semibold highlight" id="statSessionId">—</span>
+          </div>
+          <div class="flex items-center gap-3" style="justify-content:space-between;">
+            <span class="text-muted">Duration</span>
+            <span class="font-semibold" id="statDuration">00:00</span>
+          </div>
+          <div class="flex items-center gap-3" style="justify-content:space-between;">
+            <span class="text-muted">Frames Analyzed</span>
+            <span class="font-semibold" id="statFrames">0</span>
+          </div>
+          <div class="flex items-center gap-3" style="justify-content:space-between;">
+            <span class="text-muted">Snapshots</span>
+            <span class="font-semibold" id="statSnapshots">0</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- Scripts -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="/static/js/charts.js"></script>
+<script src="/static/js/main.js"></script>
+<script>
+  // Browser Webcam Handler (Alternative to backend OpenCV stream)
+  let browserStream = null;
+  let browserFrameInterval = null;
+  const videoFeed = document.getElementById('videoFeed');
+  const browserCamVideo = document.getElementById('browserCamVideo');
+  const browserCamCanvas = document.getElementById('browserCamCanvas');
+  const btnModeOpenCV = document.getElementById('btnModeOpenCV');
+  const btnModeBrowser = document.getElementById('btnModeBrowser');
+
+  async function setCameraMode(mode) {
+    if (mode === 'browser') {
+      try {
+        browserStream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+        browserCamVideo.srcObject = browserStream;
+        browserCamVideo.style.display = 'block';
+        videoFeed.style.display = 'none';
+
+        btnModeBrowser.classList.add('active');
+        btnModeOpenCV.classList.remove('active');
+
+        // Loop push frames to server for analysis
+        const ctx = browserCamCanvas.getContext('2d');
+        browserCamCanvas.width = 480;
+        browserCamCanvas.height = 360;
+
+        browserFrameInterval = setInterval(() => {
+          if (!browserCamVideo.videoWidth) return;
+          ctx.drawImage(browserCamVideo, 0, 0, 480, 360);
+          const b64 = browserCamCanvas.toDataURL('image/jpeg', 0.7);
+          fetch('/api/browser_frame', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ frame: b64 })
+          }).catch(() => {});
+        }, 350);
+
+        showToast('🌐 Browser camera activated & streaming', 'success');
+      } catch(err) {
+        showToast('Camera permission denied or camera not found.', 'error');
+      }
+    } else {
+      if (browserStream) {
+        browserStream.getTracks().forEach(t => t.stop());
+        browserStream = null;
+      }
+      if (browserFrameInterval) clearInterval(browserFrameInterval);
+      browserCamVideo.style.display = 'none';
+      videoFeed.style.display = 'block';
+      btnModeOpenCV.classList.add('active');
+      btnModeBrowser.classList.remove('active');
+      showToast('📹 Switched to device camera stream', 'info');
+    }
+  }
+
+  function dismissStressAlert() {
+    document.getElementById('stressAlert').classList.remove('visible');
+  }
+</script>
+</body>
+</html>
